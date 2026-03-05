@@ -1,0 +1,42 @@
+"""
+Pydantic data models for the storytelling system.
+"""
+
+from typing import List
+from pydantic import BaseModel
+
+
+class StoryIdea(BaseModel):
+    """
+    Model representing a basic story idea.
+    """
+    title: str
+    description: str
+    genre: str
+
+
+class SeriesBible(BaseModel):
+    """
+    Model representing the foundational elements and lore of a series.
+    """
+    archetype: str
+    protagonist: str
+    supporting_characters: List[str]
+    central_conflict: str
+
+
+class EpisodeBeat(BaseModel):
+    """
+    Model representing a specific narrative beat within an episode.
+    """
+    beat_type: str
+    content: str
+    time_range: str
+
+
+class EpisodeStructure(BaseModel):
+    """
+    Model representing the structural breakdown of a single episode.
+    """
+    episode_number: int
+    beats: List[EpisodeBeat]
