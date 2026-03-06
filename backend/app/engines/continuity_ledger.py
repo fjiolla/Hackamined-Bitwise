@@ -5,6 +5,10 @@ Engine for tracking narrative continuity across episodes.
 from typing import Dict, Any, List
 
 from app.models.story_models import EpisodeStructure
+import spacy
+from app.analysis.semantic_scorer import is_secret_revealed, is_unresolved_thread
+
+nlp = spacy.load("en_core_web_sm")
 
 
 class ContinuityLedger:
@@ -23,41 +27,36 @@ class ContinuityLedger:
         self.timeline_events: List[str] = []
 
     def update_from_episode(self, episode: EpisodeStructure):
-        """
-        Extract important events from episode beats and update ledger.
-        
-        Args:
-            episode: The episode structure containing story beats.
-        """
-        # Hackathon mock logic: In a real app we would use an LLM
-        # to analyse the episode beats and extract these details.
-        # For prototype purposes, we are doing a simplified mock extraction.
-        
         self.timeline_events.append(f"Episode {episode.episode_number} occurred.")
         
         for beat in episode.beats:
+            doc = nlp(beat.content)
             content_lower = beat.content.lower()
             
-            # Very basic string matching mock for hackathon prototype
-            if "aisha" in content_lower and "Aisha" not in self.characters_introduced:
-                self.characters_introduced.append("Aisha")
-            if "zara" in content_lower and "Zara" not in self.characters_introduced:
-                self.characters_introduced.append("Zara")
-                
-            if "secret" in content_lower or "lies" in content_lower:
-                secret_mock = "Aisha can hear lies"
-                if secret_mock not in self.revealed_secrets:
-                    self.revealed_secrets.append(secret_mock)
+            # Extract character names automatically
+            for ent in doc.ents:
+                if ent.label_ == "PERSON":
+                    if ent.text not in self.characters_introduced:
+                        self.characters_introduced.append(ent.text)
             
-            if "uncover" in content_lower or "truth" in content_lower:
-                thread_mock = "What is Zara hiding?"
-                if thread_mock not in self.unresolved_threads:
-                    self.unresolved_threads.append(thread_mock)
+            # Detect revealed secrets — store actual beat content
+            if is_secret_revealed(beat.content):
+                secret = f"Ep{episode.episode_number} - {beat.beat_type}: {beat.content[:80]}"
+                if secret not in self.revealed_secrets:
+                    self.revealed_secrets.append(secret)
             
-            if "follows" in content_lower:
-                event_mock = "Aisha followed Zara after class"
-                if event_mock not in self.timeline_events:
-                    self.timeline_events.append(event_mock)
+            # Detect unresolved threads — store actual beat content
+            if is_unresolved_thread(beat.content):
+                thread = f"Ep{episode.episode_number} - {beat.beat_type}: {beat.content[:80]}"
+                if thread not in self.unresolved_threads:
+                    self.unresolved_threads.append(thread)
+            
+            # Track significant timeline events from twist and cliffhanger beats
+            if beat.beat_type.lower() in ["twist", "cliffhanger"]:
+                event = f"Ep{episode.episode_number} - {beat.content[:80]}"
+                if event not in self.timeline_events:
+                    self.timeline_events.append(event)
+                    
 
     def get_summary(self) -> Dict[str, List[str]]:
         """

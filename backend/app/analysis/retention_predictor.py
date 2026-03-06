@@ -5,10 +5,11 @@ Module for predicting retention risk across episode beats.
 from typing import Dict, Any, List
 
 from app.models.story_models import EpisodeStructure
+from app.analysis.semantic_scorer import score_engagement
 
 
 class RetentionRiskPredictor:
-    def predict_retention_risk(self, episode: EpisodeStructure) -> List[Dict[str, Any]]:
+    def predict_retention_risk(self, episode: EpisodeStructure, emotional_analysis: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         results = []
         
         if not episode.beats:
@@ -17,37 +18,28 @@ class RetentionRiskPredictor:
         beats_count = len(episode.beats)
 
         for index, beat in enumerate(episode.beats):
-            # Base Risk
-            risk_score = 30
-            
-            content_lower = beat.content.lower()
-            beat_type_lower = beat.beat_type.lower()
-            
-            # Dialogue Density
-            if '"' in beat.content or "'" in beat.content:
-                risk_score += 10
+            engagement = score_engagement(beat.content)
+            # engagement is -1 to +1
+            # high engagement = low risk, low engagement = high risk
+            if engagement > 0.3:
+                risk_score = 20   # LOW
+            elif engagement > 0:
+                risk_score = 45   # MEDIUM
+            else:
+                risk_score = 70   # HIGH
                 
-            # Hook Strength (only applies to the first beat)
-            if index == 0:
-                hook_keywords = ["suddenly", "secret", "reveals", "danger"]
-                if not any(word in content_lower for word in hook_keywords):
-                    risk_score += 20
-                    
-            # Flatness
-            if beat_type_lower in ["conflict", "escalation"]:
-                flatness_keywords = ["talks", "walks", "sits", "explains"]
-                if any(word in content_lower for word in flatness_keywords):
-                    risk_score += 30
-                    
-            # Cliffhanger Strength (only applies to the last beat)
-            if index == beats_count - 1:
-                cliffhanger_keywords = ["deadline", "danger", "?"]
-                if any(word in content_lower for word in cliffhanger_keywords):
-                    risk_score -= 20
-                    
-            # Clamp risk score to be at least 0
-            if risk_score < 0:
-                risk_score = 0
+            # Get emotion score for this beat if available
+            emotion_score = 0.0
+            if emotional_analysis and index < len(emotional_analysis):
+                emotion_score = emotional_analysis[index]['emotion_score']
+
+            # High emotional intensity = lower retention risk
+            if abs(emotion_score) >= 0.7:
+                risk_score -= 15
+            elif abs(emotion_score) >= 0.4:
+                risk_score -= 8
+            elif abs(emotion_score) < 0.1:
+                risk_score += 15
                 
             # Determine Risk Level Mapping
             if risk_score <= 35:
@@ -57,11 +49,19 @@ class RetentionRiskPredictor:
             else:
                 risk_level = "HIGH"
                 
+            if risk_level == "HIGH":
+                explanation = f"High drop-off risk at {beat.time_range} — semantic engagement score {round(engagement, 2)} indicates insufficient tension to retain viewers"
+            elif risk_level == "MEDIUM":
+                explanation = f"Moderate retention risk at {beat.time_range} — engagement score {round(engagement, 2)} suggests room for improvement"
+            else:
+                explanation = f"Low retention risk at {beat.time_range} — strong engagement score {round(engagement, 2)} should keep viewers watching"
+
             results.append({
                 "beat_index": index + 1,
                 "time_range": beat.time_range,
                 "risk_score": risk_score,
-                "risk_level": risk_level
+                "risk_level": risk_level,
+                "explanation": explanation
             })
             
         return results

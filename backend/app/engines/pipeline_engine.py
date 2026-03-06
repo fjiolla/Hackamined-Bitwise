@@ -2,9 +2,10 @@
 Pipeline Engine for orchestrating the end-to- natural narrative generation workflow.
 """
 
-from typing import Dict, Any
+import asyncio
+from typing import Dict, Any, List
 
-from app.models.story_models import StoryIdea
+from app.models.story_models import StoryIdea, SeriesBible
 from app.engines.bible_engine import SeriesBibleGenerator
 from app.engines.episode_generator import EpisodeGenerator
 from app.engines.continuity_ledger import ContinuityLedger
@@ -22,12 +23,8 @@ class PipelineEngine:
     """
 
     def __init__(self):
-        """
-        Initializes the various components of the pipeline.
-        """
         self.bible_generator = SeriesBibleGenerator()
         self.episode_generator = EpisodeGenerator()
-        self.continuity_ledger = ContinuityLedger()
         self.emotional_analyzer = EmotionalArcAnalyzer()
         self.cliffhanger_scorer = CliffhangerScorer()
         self.retention_predictor = RetentionRiskPredictor()
@@ -35,66 +32,106 @@ class PipelineEngine:
         self.suggestion_engine = SuggestionEngine()
         self.script_generator = ScriptGenerator()
 
-    def run_pipeline(self, story: StoryIdea) -> Dict[str, Any]:
-        """
-        Runs the full story generation and analysis pipeline.
+    def calculate_series_arc_score(self, processed_episodes: list) -> dict:
         
-        Args:
-            story: The initial short story idea and genre.
-            
-        Returns:
-            A cohesive dictionary combining all generated narrative data, 
-            analysis tools, and optimizations.
-        """
-        # 1. Generate Series Bible
-        series_bible = self.bible_generator.generate_series_bible(story)
+        cliffhanger_scores = [
+            ep['cliffhanger_score']['score']
+            for ep in processed_episodes
+            if ep.get('cliffhanger_score') and ep['cliffhanger_score'].get('score') is not None
+        ]
+        avg_cliffhanger = sum(cliffhanger_scores) / len(cliffhanger_scores) if cliffhanger_scores else 0
+        
+        all_emotions = [
+            beat['emotion_score']
+            for ep in processed_episodes
+            for beat in ep.get('emotional_analysis', [])
+            if beat.get('emotion_score') is not None
+        ]
+        emotional_variance = (max(all_emotions) - min(all_emotions)) if len(all_emotions) > 1 else 0
+        
+        high_risk_count = sum(
+            1 for ep in processed_episodes
+            for beat in ep.get('retention_risk', [])
+            if beat.get('risk_level') == 'HIGH'
+        )
+        total_beats = sum(len(ep.get('retention_risk', [])) for ep in processed_episodes)
+        
+        cliffhanger_component = round((avg_cliffhanger / 10) * 40)
+        emotion_component = round(min(emotional_variance, 1.0) * 35)
+        retention_component = round(
+            max(0, (1 - high_risk_count / total_beats)) * 25
+        ) if total_beats > 0 else 0
+        
+        total = cliffhanger_component + emotion_component + retention_component
+        
+        if total >= 80:
+            grade = "A"
+            verdict = "Strong narrative arc with excellent tension and emotional range."
+        elif total >= 60:
+            grade = "B"
+            verdict = "Moderate arc with good structure but room for improvement."
+        else:
+            grade = "C"
+            verdict = "Weak arc — cliffhangers or emotional variance need improvement."
+        
+        return {
+            "series_arc_score": total,
+            "grade": grade,
+            "verdict": verdict,
+            "breakdown": {
+                "cliffhanger_strength": cliffhanger_component,
+                "emotional_variance": emotion_component,
+                "retention_health": retention_component
+            },
+            "explanation": (
+                f"Series scored {total}/100 (Grade {grade}). "
+                f"Cliffhanger strength contributed {cliffhanger_component}/40, "
+                f"emotional variance {emotion_component}/35, "
+                f"retention health {retention_component}/25. "
+                f"{verdict}"
+            )
+        }
 
-        # 2. Generate Episode Series
-        episodes = self.episode_generator.generate_series(
+    async def run_pipeline(self, story: StoryIdea) -> Dict[str, Any]:
+        continuity_ledger = ContinuityLedger()
+        series_bible = await self.bible_generator.generate_series_bible(story)
+
+        episodes = await self.episode_generator.generate_series(
             series_bible,
             episode_count=story.episode_count
         )
 
-        # 3. Initialise Continuity Ledger (created in __init__, but we process here)
         processed_episodes = []
+        total_episodes = len(episodes)
 
-        # 4. For each episode:
-        for episode in episodes:
-            # update ledger
-            self.continuity_ledger.update_from_episode(episode)
+        for index, episode in enumerate(episodes):
+            is_last_episode = index == total_episodes - 1
+            episode.is_last_episode = is_last_episode
             
-            # run emotional analysis
+            continuity_ledger.update_from_episode(episode)
             emotional_analysis = self.emotional_analyzer.analyse_episode(episode)
-            
-            # score cliffhanger
             cliffhanger_score = self.cliffhanger_scorer.score_cliffhanger(episode)
-            
-            # predict retention risk
-            retention_risk = self.retention_predictor.predict_retention_risk(episode)
-            
-            # run stress tests
+            retention_risk = self.retention_predictor.predict_retention_risk(
+                episode,
+                emotional_analysis=emotional_analysis
+            )
             stress_test_results = self.stress_tester.run_tests(
                 episode=episode,
                 emotional_analysis=emotional_analysis,
                 cliffhanger_score=cliffhanger_score,
                 retention_results=retention_risk
             )
-            
-            # generate suggestions
             suggestions_result = self.suggestion_engine.generate_suggestions(
                 episode=episode,
-                issues=stress_test_results
+                issues=stress_test_results,
+                emotional_analysis=emotional_analysis,
+                retention_results=retention_risk,
+                cliffhanger_score=cliffhanger_score
             )
-            
-            # generate script
-            script = self.script_generator.generate_script(episode, series_bible)
-            episode.script = script
-            
-            # Use Pydantic dict formatting to return clean structured JSON
+
             processed_episodes.append({
                 "episode_number": episode.episode_number,
                 "beats": [beat.model_dump() for beat in episode.beats],
-                "script": script,
                 "emotional_analysis": emotional_analysis,
                 "cliffhanger_score": cliffhanger_score,
                 "retention_risk": retention_risk,
@@ -102,8 +139,79 @@ class PipelineEngine:
                 "suggestions": suggestions_result.get("suggestions", [])
             })
 
-        # 5. Collect all outputs
+        # Generate scripts sequentially so each episode can reference the previous ending
+        previous_ending = ""
+        for index, episode in enumerate(episodes):
+            script = await self.script_generator.generate_script(
+                episode,
+                series_bible,
+                is_last_episode=episode.is_last_episode,
+                previous_ending=previous_ending
+            )
+            episode.script = script
+            processed_episodes[index]["script"] = script
+            # Pass last 20 lines of this script as context to next episode
+            previous_ending = "\n".join(script.strip().split("\n")[-20:])
+
         return {
             "series_bible": series_bible.model_dump(),
+            "series_arc_score": self.calculate_series_arc_score(processed_episodes),
             "episodes": processed_episodes
+        }
+
+    async def regenerate_episode(
+        self,
+        episode_number: int,
+        series_bible: SeriesBible,
+        suggestions: List[str],
+        is_last_episode: bool = False,
+        prior_context: str = "",
+        next_episode_hook: str = ""
+    ) -> Dict[str, Any]:
+
+        episode = await self.episode_generator.regenerate_episode(
+            episode_number=episode_number,
+            series_bible=series_bible,
+            suggestions=suggestions,
+            is_last_episode=is_last_episode,
+            prior_context=prior_context,
+            next_episode_hook=next_episode_hook
+        )
+        episode.is_last_episode = is_last_episode
+
+        emotional_analysis = self.emotional_analyzer.analyse_episode(episode)
+        cliffhanger_score = self.cliffhanger_scorer.score_cliffhanger(episode)
+        retention_risk = self.retention_predictor.predict_retention_risk(
+            episode,
+            emotional_analysis=emotional_analysis
+        )
+        stress_test_results = self.stress_tester.run_tests(
+            episode=episode,
+            emotional_analysis=emotional_analysis,
+            cliffhanger_score=cliffhanger_score,
+            retention_results=retention_risk
+        )
+        suggestions_result = self.suggestion_engine.generate_suggestions(
+            episode=episode,
+            issues=stress_test_results,
+            emotional_analysis=emotional_analysis,
+            retention_results=retention_risk,
+            cliffhanger_score=cliffhanger_score
+        )
+        script = await self.script_generator.generate_script(
+            episode,
+            series_bible,
+            is_last_episode=is_last_episode,
+            previous_ending=prior_context  # Use prior_context as ending reference for regeneration
+        )
+
+        return {
+            "episode_number": episode.episode_number,
+            "beats": [beat.model_dump() for beat in episode.beats],
+            "script": script,
+            "emotional_analysis": emotional_analysis,
+            "cliffhanger_score": cliffhanger_score,
+            "retention_risk": retention_risk,
+            "issues": stress_test_results.get("issues", []),
+            "suggestions": suggestions_result.get("suggestions", [])
         }

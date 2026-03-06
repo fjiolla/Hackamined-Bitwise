@@ -2,16 +2,32 @@
 Analyzer for detecting emotional shifts across episode beats.
 """
 
-import random
+from transformers import pipeline
 from typing import Dict, Any, List
 
 from app.models.story_models import EpisodeStructure
 
+sentiment_pipeline = pipeline(
+    "sentiment-analysis",
+    model="cardiffnlp/twitter-roberta-base-sentiment"
+)
 
-def score_emotion(text: str) -> float:
-    # Hackathon prototype: returning a random score for now
-    # In a real implementation, this would use an NLP library or LLM
-    return round(random.uniform(-1.0, 1.0), 2)
+def score_emotion(text: str, beat_type: str = "") -> float:
+    result = sentiment_pipeline(text[:512])[0]
+    score = result['score']
+    label = result['label']
+
+    if label == 'LABEL_0':
+        raw = -round(score, 2)
+    elif label == 'LABEL_2':
+        raw = round(score, 2)
+    else:
+        raw = 0.0
+
+    if beat_type.lower() == "cliffhanger":
+        return abs(raw)
+
+    return raw
 
 
 class EmotionalArcAnalyzer:
@@ -25,7 +41,7 @@ class EmotionalArcAnalyzer:
         
         for index, beat in enumerate(episode.beats):
             # 1. Compute a sentiment score for each beat.
-            current_score = score_emotion(beat.content)
+            current_score = score_emotion(beat.content, beat.beat_type)
             
             risk_flag = False
             

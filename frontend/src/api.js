@@ -23,3 +23,13 @@ export const suggestEpisodes = async (storyData) => {
         throw error;
     }
 };
+
+export const regenerateEpisode = async (regenerateData) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/regenerate-episode`, regenerateData);
+        return response.data;
+    } catch (error) {
+        console.error('Error calling regenerate API:', error);
+        throw error;
+    }
+};

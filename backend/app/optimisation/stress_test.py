@@ -5,6 +5,7 @@ Module for testing an episode's narrative and detecting structural weaknesses.
 from typing import Dict, Any, List
 
 from app.models.story_models import EpisodeStructure
+from app.analysis.semantic_scorer import score_engagement, score_narrative_flow, score_cliffhanger_semantic
 
 
 class NarrativeStressTest:
@@ -38,15 +39,9 @@ class NarrativeStressTest:
             return {"issues": issues}
 
         # 1. Hook Strength Test
-        hook_beat = episode.beats[0]
-        hook_content = hook_beat.content.lower()
-        tension_words = ["suddenly", "secret", "danger", "reveals"]
-
-        if not any(word in hook_content for word in tension_words):
-            issues.append({
-                "type": "weak_hook",
-                "message": "Hook lacks immediate tension."
-            })
+        hook_engagement = score_engagement(episode.beats[0].content)
+        if hook_engagement < 0:
+            issues.append({"type": "weak_hook", "message": "Hook lacks immediate tension."})
 
         # 2. Emotional Flatness Test
         has_flat_emotion = any(
@@ -60,12 +55,13 @@ class NarrativeStressTest:
             })
 
         # 3. Cliffhanger Impact Test
-        score = cliffhanger_score.get("score", 0)
-        if score < 6:
-            issues.append({
-                "type": "weak_cliffhanger",
-                "message": f"Cliffhanger score is low ({score}/10)."
-            })
+        if not episode.is_last_episode:
+            cliff_result = score_cliffhanger_semantic(episode.beats[-1].content)
+            if cliff_result["score"] < 4:
+                issues.append({
+                    "type": "weak_cliffhanger",
+                    "message": f"Cliffhanger score is low ({cliff_result['score']}/10)."
+                })
 
         # 4. Retention Risk Test
         has_high_risk = any(
@@ -77,5 +73,8 @@ class NarrativeStressTest:
                 "type": "high_retention_risk",
                 "message": "One or more beats have a HIGH risk of viewer drop-off."
             })
+
+        flow_issues = score_narrative_flow(episode.beats)
+        issues.extend(flow_issues)
 
         return {"issues": issues}

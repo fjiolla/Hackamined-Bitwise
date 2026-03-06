@@ -14,7 +14,7 @@ class SeriesBibleGenerator:
     Engine to convert a StoryIdea into a structured SeriesBible.
     """
     
-    def generate_series_bible(self, story: StoryIdea) -> SeriesBible:
+    async def generate_series_bible(self, story: StoryIdea) -> SeriesBible:
         """
         Generates a SeriesBible given a StoryIdea.
         
@@ -35,7 +35,8 @@ class SeriesBibleGenerator:
         )
         
         # 2. Send prompt to an LLM helper function
-        response_text = call_llm(prompt).strip()
+        response_text = await call_llm(prompt)
+        response_text = response_text.strip()
         
         # Parse the structured JSON output
         if response_text.startswith("```json"):
@@ -58,7 +59,7 @@ class SeriesBibleGenerator:
         
         return series_bible
 
-    def suggest_episode_count(self, story: StoryIdea) -> int:
+    async def suggest_episode_count(self, story: StoryIdea) -> int:
         """
         Suggests an optimal number of episodes based on the story idea complexity.
         
@@ -75,7 +76,8 @@ class SeriesBibleGenerator:
             f"Description: {story.description}\n"
             f"Return ONLY a single integer between 5 and 8. Nothing else. No explanation."
         )
-        response = call_llm(prompt).strip()
+        response_text = await call_llm(prompt)
+        response = response_text.strip()
         try:
             count = int(response)
             if count < 5: return 5

@@ -2,8 +2,17 @@
 Pydantic data models for the storytelling system.
 """
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
+
+
+class RegenerateRequest(BaseModel):
+    episode_number: int
+    series_bible: 'SeriesBible'
+    suggestions: List[str]
+    is_last_episode: bool = False
+    prior_context: str = ""
+    next_episode_hook: str = ""
 
 
 class StoryIdea(BaseModel):
@@ -42,3 +51,4 @@ class EpisodeStructure(BaseModel):
     episode_number: int
     beats: List[EpisodeBeat]
     script: str = ""
+    is_last_episode: bool = False

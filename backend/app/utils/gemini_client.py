@@ -12,7 +12,7 @@ genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 
-def call_llm(prompt: str) -> str:
+async def call_llm(prompt: str) -> str:
     """
     Calls the Gemini API with the given prompt.
     

@@ -1,41 +1,40 @@
-import React, { useState } from 'react';
-import { generateSeries, suggestEpisodes } from '../api';
+import React, { useState, useEffect } from 'react';
+import { generateSeries } from '../api';
+
+const LOADING_STEPS = [
+    "Generating Series Bible...",
+    "Generating Episodes...",
+    "Analysing Emotional Arc...",
+    "Scoring Cliffhangers...",
+    "Predicting Retention Risk...",
+    "Writing Screenplays..."
+];
 
 const StoryInput = ({ onGenerateFullResult }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [genre, setGenre] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [step, setStep] = useState(1);
+    const [genre, setGenre] = useState('Drama');
     const [episodeCount, setEpisodeCount] = useState(5);
-    const [suggestionMessage, setSuggestionMessage] = useState('');
+    
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [loadingStepIndex, setLoadingStepIndex] = useState(-1);
+    const [error, setError] = useState('');
 
-    const handleAnalyse = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-
-        try {
-            const result = await suggestEpisodes({
-                title,
-                description,
-                genre
-            });
-            const count = result.suggested_count || 5;
-            setEpisodeCount(count);
-            setSuggestionMessage(`We recommend ${count} episodes for this story.`);
-            setStep(2);
-        } catch (err) {
-            setError('Failed to analyse story. Please check the backend connection.');
-        } finally {
-            setLoading(false);
+    // Timer effect for sequential loading text visualization
+    useEffect(() => {
+        let interval;
+        if (isGenerating && loadingStepIndex < LOADING_STEPS.length - 1) {
+            interval = setInterval(() => {
+                setLoadingStepIndex(prev => prev + 1);
+            }, 3000);
         }
-    };
+        return () => clearInterval(interval);
+    }, [isGenerating, loadingStepIndex]);
 
     const handleGenerate = async (e) => {
         e.preventDefault();
-        setLoading(true);
+        setIsGenerating(true);
+        setLoadingStepIndex(0);
         setError('');
 
         try {
@@ -48,160 +47,235 @@ const StoryInput = ({ onGenerateFullResult }) => {
             onGenerateFullResult(result);
         } catch (err) {
             setError('Failed to generate series. Please check the backend connection.');
-        } finally {
-            setLoading(false);
+            setIsGenerating(false);
         }
     };
 
+    if (isGenerating) {
+        return (
+            <div className="landing-page">
+                <div style={styles.loadingContainer} className="fade-in">
+                    <h2 style={styles.loadingTitle}>Forging your Series</h2>
+                    <div style={styles.stepsList}>
+                        {LOADING_STEPS.map((step, index) => {
+                            const isPast = index < loadingStepIndex;
+                            const isActive = index === loadingStepIndex;
+                            const isFuture = index > loadingStepIndex;
+                            
+                            return (
+                                <div 
+                                    key={index}
+                                    style={{
+                                        ...styles.loadingStep,
+                                        opacity: isFuture ? 0.3 : 1,
+                                        color: isPast ? 'var(--accent-color)' : 'var(--text-primary)'
+                                    }}
+                                >
+                                    <span style={{ width: '24px', display: 'inline-block' }}>
+                                        {isPast ? '✓' : isActive ? '⏳' : '○'}
+                                    </span>
+                                    <span>{step}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="story-input-container" style={styles.container}>
-            <h2>Generate EpisodeIQ Series</h2>
-            <form onSubmit={step === 1 ? handleAnalyse : handleGenerate} style={styles.form}>
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Title</label>
-                    <input
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        required
-                        disabled={step === 2}
-                        style={styles.input}
-                        placeholder="E.g. The Truth Frequency"
-                    />
-                </div>
+        <div className="landing-page fade-in">
+            <div style={styles.header}>
+                <h1 style={styles.logo}>Episode<span style={{ color: 'var(--accent-color)' }}>IQ</span></h1>
+                <p style={styles.tagline}>Turn any idea into a complete short-form series</p>
+            </div>
 
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Genre</label>
-                    <input
-                        type="text"
-                        value={genre}
-                        onChange={(e) => setGenre(e.target.value)}
-                        required
-                        disabled={step === 2}
-                        style={styles.input}
-                        placeholder="E.g. Mystery"
-                    />
-                </div>
+            <div style={styles.cardContainer}>
+                <form onSubmit={handleGenerate} style={styles.form}>
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Story Title</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            required
+                            style={styles.input}
+                            placeholder="E.g. The Truth Frequency"
+                        />
+                    </div>
 
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Story Idea</label>
-                    <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        required
-                        disabled={step === 2}
-                        style={styles.textarea}
-                        placeholder="A girl discovers she can hear people's lies..."
-                        rows="4"
-                    />
-                </div>
+                    <div style={styles.rowGroup}>
+                        <div style={{...styles.formGroup, flex: 2}}>
+                            <label style={styles.label}>Genre</label>
+                            <select 
+                                value={genre} 
+                                onChange={(e) => setGenre(e.target.value)}
+                                style={styles.select}
+                            >
+                                <option value="Drama">Drama</option>
+                                <option value="Thriller">Thriller</option>
+                                <option value="Romance">Romance</option>
+                                <option value="Horror">Horror</option>
+                                <option value="Comedy">Comedy</option>
+                                <option value="Sci-Fi">Sci-Fi</option>
+                            </select>
+                        </div>
 
-                {step === 2 && (
-                    <div style={styles.suggestionBox}>
-                        <p style={styles.suggestionText}>{suggestionMessage}</p>
-                        <div style={styles.formGroup}>
-                            <label style={styles.label}>Confirmed Episode Count (5-8)</label>
+                        <div style={{...styles.formGroup, flex: 1}}>
+                            <label style={styles.label}>Episode Count</label>
                             <select 
                                 value={episodeCount} 
                                 onChange={(e) => setEpisodeCount(e.target.value)}
-                                style={styles.input}
+                                style={styles.select}
                             >
-                                <option value="5">5 Episodes</option>
-                                <option value="6">6 Episodes</option>
-                                <option value="7">7 Episodes</option>
-                                <option value="8">8 Episodes</option>
+                                <option value="5">5</option>
+                                <option value="6">6</option>
+                                <option value="7">7</option>
+                                <option value="8">8</option>
                             </select>
                         </div>
                     </div>
-                )}
 
-                {error && <div style={styles.error}>{error}</div>}
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Description</label>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            required
+                            style={styles.textarea}
+                            placeholder="A girl discovers she can hear people's lies..."
+                            rows="3"
+                        />
+                    </div>
 
-                {step === 1 ? (
-                    <button type="submit" disabled={loading} style={styles.button}>
-                        {loading ? 'Analysing...' : 'Analyse Story'}
+                    {error && <div style={styles.error}>{error}</div>}
+
+                    <button type="submit" style={styles.submitBtn}>
+                        Generate Series
                     </button>
-                ) : (
-                    <button type="submit" disabled={loading} style={{...styles.button, backgroundColor: '#28a745'}}>
-                        {loading ? 'Generating...' : 'Generate Series'}
-                    </button>
-                )}
-            </form>
+                </form>
+            </div>
         </div>
     );
 };
 
 const styles = {
-    container: {
-        maxWidth: '600px',
-        margin: '0 auto',
-        padding: '20px',
-        backgroundColor: '#1e1e1e',
-        borderRadius: '8px',
-        color: '#fff',
-        border: '1px solid #333'
+    header: {
+        textAlign: 'center',
+        marginBottom: '40px'
+    },
+    logo: {
+        fontSize: '48px',
+        fontWeight: '900',
+        letterSpacing: '-1px',
+        margin: '0 0 8px 0'
+    },
+    tagline: {
+        fontSize: '18px',
+        color: 'var(--text-secondary)',
+        margin: 0
+    },
+    cardContainer: {
+        backgroundColor: 'var(--card-bg)',
+        padding: '40px',
+        borderRadius: 'var(--border-radius)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--box-shadow)',
+        width: '100%',
+        maxWidth: '600px'
     },
     form: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '15px'
+        gap: '24px'
+    },
+    rowGroup: {
+        display: 'flex',
+        gap: '20px'
     },
     formGroup: {
         display: 'flex',
         flexDirection: 'column',
+        gap: '8px',
         textAlign: 'left'
     },
     label: {
-        marginBottom: '5px',
-        fontWeight: 'bold',
+        fontWeight: '600',
         fontSize: '14px',
-        color: '#ddd'
+        color: 'var(--text-secondary)'
     },
     input: {
-        padding: '10px',
-        borderRadius: '4px',
-        border: '1px solid #444',
-        background: '#2d2d2d',
-        color: '#fff',
-        fontSize: '16px'
+        padding: '12px 16px',
+        borderRadius: '8px',
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-color)',
+        color: 'var(--text-primary)',
+        fontSize: '16px',
+        fontFamily: 'var(--font-family)',
+        outline: 'none',
+        transition: 'border-color 0.2s'
+    },
+    select: {
+        padding: '12px 16px',
+        borderRadius: '8px',
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-color)',
+        color: 'var(--text-primary)',
+        fontSize: '16px',
+        fontFamily: 'var(--font-family)',
+        cursor: 'pointer',
+        outline: 'none'
     },
     textarea: {
-        padding: '10px',
-        borderRadius: '4px',
-        border: '1px solid #444',
-        background: '#2d2d2d',
-        color: '#fff',
+        padding: '12px 16px',
+        borderRadius: '8px',
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-color)',
+        color: 'var(--text-primary)',
         fontSize: '16px',
-        resize: 'vertical'
+        fontFamily: 'var(--font-family)',
+        resize: 'vertical',
+        outline: 'none'
     },
-    button: {
-        padding: '12px 20px',
-        backgroundColor: '#007bff',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        fontSize: '16px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        marginTop: '10px'
+    submitBtn: {
+        marginTop: '16px',
+        padding: '16px',
+        fontSize: '18px',
+        width: '100%'
     },
     error: {
-        color: '#ff6b6b',
+        color: '#ff4444',
         fontSize: '14px',
-        marginTop: '-5px'
-    },
-    suggestionBox: {
-        backgroundColor: '#2a2a2a',
-        padding: '15px',
+        backgroundColor: 'rgba(255, 68, 68, 0.1)',
+        padding: '12px',
         borderRadius: '6px',
-        borderLeft: '4px solid #f39c12',
-        marginTop: '10px',
-        marginBottom: '10px'
+        border: '1px solid rgba(255, 68, 68, 0.2)'
     },
-    suggestionText: {
-        margin: '0 0 10px 0',
-        color: '#f1c40f',
-        fontWeight: 'bold'
+    loadingContainer: {
+        backgroundColor: 'var(--card-bg)',
+        padding: '40px',
+        borderRadius: 'var(--border-radius)',
+        border: '1px solid var(--border-color)',
+        minWidth: '400px',
+        boxShadow: 'var(--box-shadow)'
+    },
+    loadingTitle: {
+        textAlign: 'center',
+        color: 'var(--accent-color)',
+        marginBottom: '24px'
+    },
+    stepsList: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+    },
+    loadingStep: {
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '16px',
+        fontWeight: '500',
+        transition: 'all 0.5s ease'
     }
 };
 
