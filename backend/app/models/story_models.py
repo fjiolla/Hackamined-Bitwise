@@ -3,7 +3,7 @@ Pydantic data models for the storytelling system.
 """
 
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class StoryIdea(BaseModel):
@@ -13,6 +13,7 @@ class StoryIdea(BaseModel):
     title: str
     description: str
     genre: str
+    episode_count: int = Field(default=5, ge=5, le=8)
 
 
 class SeriesBible(BaseModel):

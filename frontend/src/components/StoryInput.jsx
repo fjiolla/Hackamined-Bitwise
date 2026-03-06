@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { generateSeries } from '../api';
+import { generateSeries, suggestEpisodes } from '../api';
 
 const StoryInput = ({ onGenerateFullResult }) => {
     const [title, setTitle] = useState('');
@@ -7,8 +7,33 @@ const StoryInput = ({ onGenerateFullResult }) => {
     const [genre, setGenre] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [step, setStep] = useState(1);
+    const [episodeCount, setEpisodeCount] = useState(5);
+    const [suggestionMessage, setSuggestionMessage] = useState('');
 
-    const handleSubmit = async (e) => {
+    const handleAnalyse = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        try {
+            const result = await suggestEpisodes({
+                title,
+                description,
+                genre
+            });
+            const count = result.suggested_count || 5;
+            setEpisodeCount(count);
+            setSuggestionMessage(`We recommend ${count} episodes for this story.`);
+            setStep(2);
+        } catch (err) {
+            setError('Failed to analyse story. Please check the backend connection.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGenerate = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
@@ -17,7 +42,8 @@ const StoryInput = ({ onGenerateFullResult }) => {
             const result = await generateSeries({
                 title,
                 description,
-                genre
+                genre,
+                episode_count: parseInt(episodeCount, 10)
             });
             onGenerateFullResult(result);
         } catch (err) {
@@ -30,7 +56,7 @@ const StoryInput = ({ onGenerateFullResult }) => {
     return (
         <div className="story-input-container" style={styles.container}>
             <h2>Generate EpisodeIQ Series</h2>
-            <form onSubmit={handleSubmit} style={styles.form}>
+            <form onSubmit={step === 1 ? handleAnalyse : handleGenerate} style={styles.form}>
                 <div style={styles.formGroup}>
                     <label style={styles.label}>Title</label>
                     <input
@@ -38,6 +64,7 @@ const StoryInput = ({ onGenerateFullResult }) => {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         required
+                        disabled={step === 2}
                         style={styles.input}
                         placeholder="E.g. The Truth Frequency"
                     />
@@ -50,6 +77,7 @@ const StoryInput = ({ onGenerateFullResult }) => {
                         value={genre}
                         onChange={(e) => setGenre(e.target.value)}
                         required
+                        disabled={step === 2}
                         style={styles.input}
                         placeholder="E.g. Mystery"
                     />
@@ -61,17 +89,43 @@ const StoryInput = ({ onGenerateFullResult }) => {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         required
+                        disabled={step === 2}
                         style={styles.textarea}
                         placeholder="A girl discovers she can hear people's lies..."
                         rows="4"
                     />
                 </div>
 
+                {step === 2 && (
+                    <div style={styles.suggestionBox}>
+                        <p style={styles.suggestionText}>{suggestionMessage}</p>
+                        <div style={styles.formGroup}>
+                            <label style={styles.label}>Confirmed Episode Count (5-8)</label>
+                            <select 
+                                value={episodeCount} 
+                                onChange={(e) => setEpisodeCount(e.target.value)}
+                                style={styles.input}
+                            >
+                                <option value="5">5 Episodes</option>
+                                <option value="6">6 Episodes</option>
+                                <option value="7">7 Episodes</option>
+                                <option value="8">8 Episodes</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+
                 {error && <div style={styles.error}>{error}</div>}
 
-                <button type="submit" disabled={loading} style={styles.button}>
-                    {loading ? 'Generating...' : 'Generate Series'}
-                </button>
+                {step === 1 ? (
+                    <button type="submit" disabled={loading} style={styles.button}>
+                        {loading ? 'Analysing...' : 'Analyse Story'}
+                    </button>
+                ) : (
+                    <button type="submit" disabled={loading} style={{...styles.button, backgroundColor: '#28a745'}}>
+                        {loading ? 'Generating...' : 'Generate Series'}
+                    </button>
+                )}
             </form>
         </div>
     );
@@ -135,6 +189,19 @@ const styles = {
         color: '#ff6b6b',
         fontSize: '14px',
         marginTop: '-5px'
+    },
+    suggestionBox: {
+        backgroundColor: '#2a2a2a',
+        padding: '15px',
+        borderRadius: '6px',
+        borderLeft: '4px solid #f39c12',
+        marginTop: '10px',
+        marginBottom: '10px'
+    },
+    suggestionText: {
+        margin: '0 0 10px 0',
+        color: '#f1c40f',
+        fontWeight: 'bold'
     }
 };
 

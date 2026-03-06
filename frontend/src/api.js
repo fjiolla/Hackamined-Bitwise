@@ -13,3 +13,13 @@ export const generateSeries = async (storyData) => {
         throw error;
     }
 };
+
+export const suggestEpisodes = async (storyData) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/suggest-episodes`, storyData);
+        return response.data;
+    } catch (error) {
+        console.error('Error calling suggest API:', error);
+        throw error;
+    }
+};

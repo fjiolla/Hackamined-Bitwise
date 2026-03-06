@@ -50,7 +50,10 @@ class PipelineEngine:
         series_bible = self.bible_generator.generate_series_bible(story)
 
         # 2. Generate Episode Series
-        episodes = self.episode_generator.generate_series(series_bible)
+        episodes = self.episode_generator.generate_series(
+            series_bible,
+            episode_count=story.episode_count
+        )
 
         # 3. Initialise Continuity Ledger (created in __init__, but we process here)
         processed_episodes = []

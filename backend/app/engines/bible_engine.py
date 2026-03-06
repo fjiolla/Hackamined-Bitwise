@@ -57,3 +57,29 @@ class SeriesBibleGenerator:
         )
         
         return series_bible
+
+    def suggest_episode_count(self, story: StoryIdea) -> int:
+        """
+        Suggests an optimal number of episodes based on the story idea complexity.
+        
+        Args:
+            story: The basic story idea.
+            
+        Returns:
+            An integer between 5 and 8.
+        """
+        prompt = (
+            f"Based on this story idea, suggest how many episodes it needs.\n"
+            f"Title: {story.title}\n"
+            f"Genre: {story.genre}\n"
+            f"Description: {story.description}\n"
+            f"Return ONLY a single integer between 5 and 8. Nothing else. No explanation."
+        )
+        response = call_llm(prompt).strip()
+        try:
+            count = int(response)
+            if count < 5: return 5
+            if count > 8: return 8
+            return count
+        except ValueError:
+            return 5
