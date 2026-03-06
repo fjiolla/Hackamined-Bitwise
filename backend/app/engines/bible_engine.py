@@ -6,7 +6,7 @@ import json
 from typing import Dict, Any
 
 from app.models.story_models import StoryIdea, SeriesBible
-from app.utils.gemini_client import call_llm
+from app.utils.groq_client import call_llm
 
 
 class SeriesBibleGenerator:
@@ -27,7 +27,7 @@ class SeriesBibleGenerator:
         # 1. Build a prompt string describing the story idea
         prompt = (
             f"Please generate a series bible for the following story idea.\n"
-            f"Return ONLY valid JSON with no extra text.\n"
+            f"Return ONLY valid JSON with no extra text or markdown codeblocks or explanation.\n"
             f"The JSON should contain precisely these string keys: 'archetype', 'protagonist', 'supporting_characters' (a list of strings), and 'central_conflict'.\n"
             f"Title: {story.title}\n"
             f"Genre: {story.genre}\n"

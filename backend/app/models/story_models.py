@@ -40,3 +40,4 @@ class EpisodeStructure(BaseModel):
     """
     episode_number: int
     beats: List[EpisodeBeat]
+    script: str = ""

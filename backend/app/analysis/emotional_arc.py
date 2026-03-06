@@ -9,15 +9,6 @@ from app.models.story_models import EpisodeStructure
 
 
 def score_emotion(text: str) -> float:
-    """
-    Mock function to compute a sentiment score for a given text.
-    
-    Args:
-        text: The content of the story beat.
-        
-    Returns:
-        A float representing the sentiment score, between -1.0 and 1.0.
-    """
     # Hackathon prototype: returning a random score for now
     # In a real implementation, this would use an NLP library or LLM
     return round(random.uniform(-1.0, 1.0), 2)
@@ -29,15 +20,6 @@ class EmotionalArcAnalyzer:
     """
     
     def analyse_episode(self, episode: EpisodeStructure) -> List[Dict[str, Any]]:
-        """
-        Detect emotional shifts across episode beats.
-        
-        Args:
-            episode: The episode structure containing story beats.
-            
-        Returns:
-            A list of dictionary results containing analysis per beat.
-        """
         results = []
         previous_score = None
         

@@ -6,7 +6,7 @@ import json
 from typing import Dict, Any, List
 
 from app.models.story_models import SeriesBible, EpisodeBeat, EpisodeStructure
-from app.utils.gemini_client import call_llm
+from app.utils.groq_client import call_llm
 
 
 class EpisodeGenerator:
@@ -28,7 +28,7 @@ class EpisodeGenerator:
         # 1 Build prompt using series_bible
         prompt = (
             f"Generate Episode {episode_number} beats based on the series bible.\n"
-            f"Return ONLY valid JSON with no extra text.\n"
+            f"Return ONLY valid JSON with no extra text or markdown codeblocks or explanation.\n"
             f"The JSON should contain precisely these string keys: 'hook', 'conflict', 'escalation', 'twist', 'cliffhanger'.\n"
             f"Each value should be a short string describing the beat.\n"
             f"Archetype: {series_bible.archetype}\n"

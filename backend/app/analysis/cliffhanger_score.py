@@ -8,20 +8,7 @@ from app.models.story_models import EpisodeStructure
 
 
 class CliffhangerScorer:
-    """
-    Evaluates the quality of a cliffhanger using an explainable scoring rubric.
-    """
-
     def score_cliffhanger(self, episode: EpisodeStructure) -> Dict[str, Any]:
-        """
-        Analyse the final beat of an episode and score it across 5 dimensions.
-        
-        Args:
-            episode: The episode structure containing story beats.
-            
-        Returns:
-            A dictionary containing the total score and a dimensional breakdown.
-        """
         if not episode.beats:
             return {
                 "score": 0,

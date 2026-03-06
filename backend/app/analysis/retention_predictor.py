@@ -8,21 +8,7 @@ from app.models.story_models import EpisodeStructure
 
 
 class RetentionRiskPredictor:
-    """
-    Predicts viewer retention risk for a given episode structure
-    using heuristics based on narrative engagement factors.
-    """
-
     def predict_retention_risk(self, episode: EpisodeStructure) -> List[Dict[str, Any]]:
-        """
-        Calculates retention risk per beat.
-        
-        Args:
-            episode: structured episode containing beats.
-            
-        Returns:
-            A list of dictionaries representing the risk per beat.
-        """
         results = []
         
         if not episode.beats:

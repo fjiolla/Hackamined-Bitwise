@@ -13,6 +13,7 @@ from app.analysis.cliffhanger_score import CliffhangerScorer
 from app.analysis.retention_predictor import RetentionRiskPredictor
 from app.optimisation.stress_test import NarrativeStressTest
 from app.optimisation.suggestion_engine import SuggestionEngine
+from app.engines.script_generator import ScriptGenerator
 
 
 class PipelineEngine:
@@ -32,6 +33,7 @@ class PipelineEngine:
         self.retention_predictor = RetentionRiskPredictor()
         self.stress_tester = NarrativeStressTest()
         self.suggestion_engine = SuggestionEngine()
+        self.script_generator = ScriptGenerator()
 
     def run_pipeline(self, story: StoryIdea) -> Dict[str, Any]:
         """
@@ -81,10 +83,15 @@ class PipelineEngine:
                 issues=stress_test_results
             )
             
+            # generate script
+            script = self.script_generator.generate_script(episode, series_bible)
+            episode.script = script
+            
             # Use Pydantic dict formatting to return clean structured JSON
             processed_episodes.append({
                 "episode_number": episode.episode_number,
                 "beats": [beat.model_dump() for beat in episode.beats],
+                "script": script,
                 "emotional_analysis": emotional_analysis,
                 "cliffhanger_score": cliffhanger_score,
                 "retention_risk": retention_risk,

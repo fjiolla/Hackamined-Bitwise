@@ -12,10 +12,9 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# <-- ADDED THIS BLOCK TO ALLOW REACT TO TALK TO FASTAPI -->
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows any frontend to connect (great for hackathons)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],  
     allow_headers=["*"],  

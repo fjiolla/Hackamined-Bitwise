@@ -16,5 +16,6 @@ class Settings(BaseModel):
     app_name: str = "EpisodeIQ"
     environment: str = "development"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
 
 settings = Settings()
