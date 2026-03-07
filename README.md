@@ -18,7 +18,7 @@ Team: Bitwise · Code: 1605 · Track: Quantloop · Leader: Krisha Shastri
 
 ## 📸 Preview
 
-> EpisodeIQ takes a story idea, generates 5–8 structured 90-second episodes with full screenplays, analyses each episode for emotional arc, cliffhanger strength, and viewer retention risk, then suggests and applies targeted fixes — all in one pipeline.
+[▶ Watch Demo](https://github.com/user-attachments/assets/be0f4196-fd23-4553-adc4-d45aad70433e)
 
 ---
 
