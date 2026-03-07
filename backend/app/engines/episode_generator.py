@@ -7,7 +7,7 @@ import asyncio
 from typing import Dict, Any, List
 
 from app.models.story_models import SeriesBible, EpisodeBeat, EpisodeStructure
-from app.utils.gemini_client import call_llm
+from app.utils.groq_client import call_llm
 
 
 class EpisodeGenerator:

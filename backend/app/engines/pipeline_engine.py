@@ -92,73 +92,78 @@ class PipelineEngine:
             )
         }
 
-    async def run_pipeline(self, story: StoryIdea) -> Dict[str, Any]:
-        continuity_ledger = ContinuityLedger()
-        series_bible = await self.bible_generator.generate_series_bible(story)
-
-        episodes = await self.episode_generator.generate_series(
-            series_bible,
-            episode_count=story.episode_count
-        )
-
-        processed_episodes = []
-        total_episodes = len(episodes)
-
-        for index, episode in enumerate(episodes):
-            is_last_episode = index == total_episodes - 1
-            episode.is_last_episode = is_last_episode
-            
-            continuity_ledger.update_from_episode(episode)
-            emotional_analysis = self.emotional_analyzer.analyse_episode(episode)
-            cliffhanger_score = self.cliffhanger_scorer.score_cliffhanger(episode)
-            retention_risk = self.retention_predictor.predict_retention_risk(
-                episode,
-                emotional_analysis=emotional_analysis
-            )
-            stress_test_results = self.stress_tester.run_tests(
-                episode=episode,
-                emotional_analysis=emotional_analysis,
-                cliffhanger_score=cliffhanger_score,
-                retention_results=retention_risk
-            )
-            suggestions_result = self.suggestion_engine.generate_suggestions(
-                episode=episode,
-                issues=stress_test_results,
-                emotional_analysis=emotional_analysis,
-                retention_results=retention_risk,
-                cliffhanger_score=cliffhanger_score
-            )
-
-            processed_episodes.append({
-                "episode_number": episode.episode_number,
-                "beats": [beat.model_dump() for beat in episode.beats],
-                "emotional_analysis": emotional_analysis,
-                "cliffhanger_score": cliffhanger_score,
-                "retention_risk": retention_risk,
-                "issues": stress_test_results.get("issues", []),
-                "suggestions": suggestions_result.get("suggestions", [])
-            })
-
-        # Generate scripts sequentially so each episode can reference the previous ending
+    async def run_pipeline(self, story) -> Dict[str, Any]:
+        continuity_ledger = ContinuityLedger()  # local, not self
+        series_bible = story.series_bible
+        episode_count = story.episode_count
+        episodes = []
+        all_scores = []
         previous_ending = ""
-        for index, episode in enumerate(episodes):
-            script = await self.script_generator.generate_script(
-                episode,
-                series_bible,
-                is_last_episode=episode.is_last_episode,
-                previous_ending=previous_ending
+
+        for ep_number in range(1, episode_count + 1):
+            ledger_summary = continuity_ledger.get_summary()
+
+            # ---- Step 1: Generate base episode once ----
+            episode = await self.episode_generator.generate_episode(
+                series_bible=series_bible,
+                episode_number=ep_number,
+                previous_ending=previous_ending,
+                continuity_context=ledger_summary
             )
-            episode.script = script
-            processed_episodes[index]["script"] = script
-            # Pass last 20 lines of this script as context to next episode
+            original_episode = episode  # anchor for regeneration
+
+            script = None
+            analysis = None
+
+            # ---- Step 2: Repair loop (regeneration only, no fresh generation) ----
+            for attempt in range(3):  # 0 = first analysis, 1 and 2 = repairs
+                script = await self.script_generator.generate_script(
+                    episode_outline=episode,
+                    previous_ending=previous_ending
+                )
+                analysis = self.stress_tester.analyse_episode(script)
+                issues = analysis.get("issues", [])
+                score = analysis.get("score", 0)
+
+                if not issues:
+                    break  # episode is good, accept it
+
+                if attempt < 2:  # only repair on attempts 0 and 1
+                    suggestions = self.suggestion_engine.generate_suggestions(issues)
+                    episode = await self.episode_generator.regenerate_episode(
+                        original_outline=original_episode,  # continuity anchor
+                        current_outline=episode,            # what to improve
+                        suggestions=suggestions,
+                        continuity_context=ledger_summary,
+                        previous_ending=previous_ending     # how last ep ended
+                    )
+                else:
+                    analysis["quality_flag"] = "failed_repair"
+
+            # ---- Step 3: Update ledger AFTER episode is finalised ----
+            continuity_ledger.update_from_episode(episode)
+
+            # ---- Step 4: Extract ending from script for next episode ----
             previous_ending = "\n".join(script.strip().split("\n")[-20:])
 
-        return {
-            "series_bible": series_bible.model_dump(),
-            "series_arc_score": self.calculate_series_arc_score(processed_episodes),
-            "episodes": processed_episodes
-        }
+            episodes.append({
+                "episode_number": ep_number,
+                "outline": episode,
+                "script": script,
+                "analysis": analysis
+            })
+            all_scores.append(score)
 
+        # ---- Weighted series score ----
+        weighted = sum(s * (i + 1) for i, s in enumerate(all_scores))
+        total_weight = sum(range(1, len(all_scores) + 1))
+        avg_score = round(weighted / total_weight, 2) if all_scores else 0
+
+        return {
+            "series_bible": series_bible,
+            "episodes": episodes,
+            "series_score": avg_score
+        }
     async def regenerate_episode(
         self,
         episode_number: int,
@@ -166,6 +171,7 @@ class PipelineEngine:
         suggestions: List[str],
         is_last_episode: bool = False,
         prior_context: str = "",
+        previous_ending: str = "",
         next_episode_hook: str = ""
     ) -> Dict[str, Any]:
 
@@ -202,7 +208,7 @@ class PipelineEngine:
             episode,
             series_bible,
             is_last_episode=is_last_episode,
-            previous_ending=prior_context  # Use prior_context as ending reference for regeneration
+            previous_ending=previous_ending
         )
 
         return {

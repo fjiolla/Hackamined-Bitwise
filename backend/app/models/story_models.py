@@ -12,6 +12,7 @@ class RegenerateRequest(BaseModel):
     suggestions: List[str]
     is_last_episode: bool = False
     prior_context: str = ""
+    previous_ending: str = ""
     next_episode_hook: str = ""
 
 

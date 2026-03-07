@@ -3,7 +3,7 @@ Engine for generating a screenplay script from episode beats.
 """
 
 from app.models.story_models import EpisodeStructure, SeriesBible
-from app.utils.gemini_client import call_llm
+from app.utils.groq_client import call_llm
 
 class ScriptGenerator:
     """

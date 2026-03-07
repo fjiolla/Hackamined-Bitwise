@@ -30,6 +30,7 @@ async def regenerate_episode_endpoint(request: RegenerateRequest) -> Dict[str, A
         suggestions=request.suggestions,
         is_last_episode=request.is_last_episode,
         prior_context=request.prior_context,
+        previous_ending=request.previous_ending,
         next_episode_hook=request.next_episode_hook
     )
 
